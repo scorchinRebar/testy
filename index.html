@@ -1,205 +1,64 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="pl">
 <head>
-  <meta charset="utf-8">
-  <title>Auth z Firestore example</title>
-  <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:20px}
-    input{display:block;margin:8px 0;padding:8px;width:300px}
-    button{padding:8px 12px;margin-right:8px}
-    #content{display:none}
-    .error{color:#b00}
-    .info{margin-top:10px}
-  </style>
+  <meta charset="UTF-8">
+  <title>firebase login</title>
 </head>
 <body>
 
-<h2>auth example</h2>
+  <h2>firebase logowanie</h2>
 
-<div id="unauth">
   <input id="email" placeholder="email">
-  <input id="password" type="password" placeholder="hasło">
-  <input id="nick" placeholder="nick przy rejestracji">
-  <button id="btnReg">rejestruj</button>
-  <button id="btnLog">loguj</button>
-  <div id="msg" class="error"></div>
-</div>
+  <input id="pass" type="password" placeholder="hasło">
+  <button id="reg">rejestruj</button>
+  <button id="log">loguj</button>
 
-<div id="content">
-  <div>zalogowany jako <span id="showNick"></span> status <span id="showStatus"></span></div>
-  <div class="info">
-    <button id="btnLogout">wyloguj</button>
-    <button id="btnRefresh">odśwież profil</button>
-  </div>
-  <div id="adminPanel" style="margin-top:20px;display:none">
-    <h4>panel admina</h4>
-    <div>tu możesz robić co chcesz</div>
-  </div>
-</div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js"
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js"
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"
-  import {
-    getAuth,
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword,
-    signOut,
-    onAuthStateChanged
-  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"
-  import {
-    getFirestore,
-    doc,
-    setDoc,
-    getDoc,
-    updateDoc
-  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"
-
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyBfmwMlvqPmLq-xxitKZyJKObkY68_aC6w",
-    authDomain: "talonowo-auth.firebaseapp.com",
-    databaseURL: "https://talonowo-auth-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "talonowo-auth",
-    storageBucket: "talonowo-auth.firebasestorage.app",
-    messagingSenderId: "1068772788641",
-    appId: "1:1068772788641:web:7dd7af691c5ee860fbe3e0",
-    measurementId: "G-Q8P9NK58DH"
-  };
-
-  const app = initializeApp(firebaseConfig)
-  const auth = getAuth(app)
-  const db = getFirestore(app)
-
-  const emailEl = document.getElementById("email")
-  const passEl = document.getElementById("password")
-  const nickEl = document.getElementById("nick")
-  const msgEl = document.getElementById("msg")
-  const unauthEl = document.getElementById("unauth")
-  const contentEl = document.getElementById("content")
-  const showNick = document.getElementById("showNick")
-  const showStatus = document.getElementById("showStatus")
-  const adminPanel = document.getElementById("adminPanel")
-
-  document.getElementById("btnReg").addEventListener("click", async () => {
-    msgEl.textContent = ""
-    const mail = emailEl.value.trim()
-    const pass = passEl.value
-    const nick = nickEl.value.trim() || "no-nick"
-    if(!mail || !pass){
-      msgEl.textContent = "wypełnij mail i hasło"
-      return
+    const firebaseConfig = {
+      apiKey: "AIzaSyBfmwMlvqPmLq-xxitKZyJKObkY68_aC6w",
+      authDomain: "talonowo-auth.firebaseapp.com",
+      databaseURL: "https://talonowo-auth-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "talonowo-auth",
+      storageBucket: "talonowo-auth.appspot.com",
+      messagingSenderId: "1068772788641",
+      appId: "1:1068772788641:web:7dd7af691c5ee860fbe3e0",
+      measurementId: "G-Q8P9NK58DH"
     }
-    try{
-      const cred = await createUserWithEmailAndPassword(auth, mail, pass)
-      const uid = cred.user.uid
 
-      await setDoc(doc(db, "users", uid), {
-        email: mail,
-        nick: nick,
-        status: "pending", 
-        blocked: false,
-        createdAt: Date.now()
-      })
-      msgEl.textContent = "zarejestrowano. sprawdź logowanie"
-      passEl.value = ""
-    }catch(e){
-      console.error(e)
-      msgEl.textContent = e.message || "błąd rejestracji"
-    }
-  })
+    const app = initializeApp(firebaseConfig)
+    const auth = getAuth(app)
 
-  document.getElementById("btnLog").addEventListener("click", async () => {
-    msgEl.textContent = ""
-    const mail = emailEl.value.trim()
-    const pass = passEl.value
-    if(!mail || !pass){
-      msgEl.textContent = "wypełnij mail i hasło"
-      return
-    }
-    try{
-      const cred = await signInWithEmailAndPassword(auth, mail, pass)
+    document.getElementById("reg").addEventListener("click", () => {
+      const mail = document.getElementById("email").value
+      const pass = document.getElementById("pass").value
 
-    }catch(e){
-      console.error(e)
-      msgEl.textContent = "złe dane albo problem z auth"
-    }
-  })
-
-  document.getElementById("btnLogout").addEventListener("click", async () => {
-    await signOut(auth)
-  })
-
-  document.getElementById("btnRefresh").addEventListener("click", async () => {
-    if(auth.currentUser) await handlePostLogin(auth.currentUser)
-  })
-
-  onAuthStateChanged(auth, async user => {
-    msgEl.textContent = ""
-    if(user){
-      await handlePostLogin(user)
-    } else {
-      contentEl.style.display = "none"
-      unauthEl.style.display = "block"
-    }
-  })
-
-  async function handlePostLogin(user){
-    // pobierz dokument profilu
-    try{
-      const ref = doc(db, "users", user.uid)
-      const snap = await getDoc(ref)
-      if(!snap.exists()){
-
-        await setDoc(ref, {
-          email: user.email || "",
-          nick: user.displayName || "no-nick",
-          status: "pending",
-          blocked: false,
-          createdAt: Date.now()
+      createUserWithEmailAndPassword(auth, mail, pass)
+        .then(() => {
+          alert("zarejestrowano")
         })
+        .catch(err => {
+          console.log(err)
+          alert(err.code)
+        })
+    })
 
-        const ns = await getDoc(ref)
-        showProfile(ns.data(), user)
-        return
-      }
-      const data = snap.data()
-      if(data.blocked){
+    document.getElementById("log").addEventListener("click", () => {
+      const mail = document.getElementById("email").value
+      const pass = document.getElementById("pass").value
 
-        await signOut(auth)
-        msgEl.textContent = "konto zablokowane"
-        return
-      }
-      showProfile(data, user)
-    }catch(e){
-      console.error(e)
-      msgEl.textContent = "błąd pobierania profilu"
-      await signOut(auth)
-    }
-  }
+      signInWithEmailAndPassword(auth, mail, pass)
+        .then(() => {
+          alert("zalogowano")
+        })
+        .catch(err => {
+          console.log(err)
+          alert(err.code)
+        })
+    })
+  </script>
 
-  function showProfile(data, user){
-    unauthEl.style.display = "none"
-    contentEl.style.display = "block"
-    showNick.textContent = data.nick || user.email
-    showStatus.textContent = data.status || "pending"
-    // pokaż panel admina jeśli status admin
-    if(data.status === "admin"){
-      adminPanel.style.display = "block"
-    } else {
-      adminPanel.style.display = "none"
-    }
-  }
-
-
-  window.setBlocked = async (uid, val) => {
-    await updateDoc(doc(db, "users", uid), { blocked: !!val })
-  }
-  window.setStatus = async (uid, status) => {
-    await updateDoc(doc(db, "users", uid), { status: status })
-  }
-
-</script>
 </body>
 </html>
-
-
