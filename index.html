@@ -16,11 +16,11 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js"
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js"
+    import { getFirestore, setDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js"
 
     const firebaseConfig = {
       apiKey: "AIzaSyBfmwMlvqPmLq-xxitKZyJKObkY68_aC6w",
       authDomain: "talonowo-auth.firebaseapp.com",
-      databaseURL: "https://talonowo-auth-default-rtdb.europe-west1.firebasedatabase.app",
       projectId: "talonowo-auth",
       storageBucket: "talonowo-auth.appspot.com",
       messagingSenderId: "1068772788641",
@@ -30,14 +30,23 @@
 
     const app = initializeApp(firebaseConfig)
     const auth = getAuth(app)
+    const db = getFirestore(app)
 
+    // REJESTRACJA + zapis do firestore
     document.getElementById("reg").addEventListener("click", () => {
       const mail = document.getElementById("email").value
       const pass = document.getElementById("pass").value
 
       createUserWithEmailAndPassword(auth, mail, pass)
-        .then(() => {
-          alert("zarejestrowano")
+        .then(async (user) => {
+
+          await setDoc(doc(db, "users", user.user.uid), {
+            email: mail,
+            role: "pending",
+            blocked: false
+          })
+
+          alert("zarejestrowano i wpisano do firestore")
         })
         .catch(err => {
           console.log(err)
@@ -50,8 +59,23 @@
       const pass = document.getElementById("pass").value
 
       signInWithEmailAndPassword(auth, mail, pass)
-        .then(() => {
-          alert("zalogowano")
+        .then(async (user) => {
+          const ref = doc(db, "users", user.user.uid)
+          const data = await getDoc(ref)
+
+          if (!data.exists()) {
+            alert("konto istnieje, ale brak danych w firestore")
+            return
+          }
+
+          const userInfo = data.data()
+
+          if (userInfo.blocked === true) {
+            alert("konto zablokowane")
+            return
+          }
+
+          alert("zalogowano rola: " + userInfo.role)
         })
         .catch(err => {
           console.log(err)
