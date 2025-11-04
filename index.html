@@ -1,61 +1,201 @@
-<!DOCTYPE html>
-<html lang="pl">
+<!doctype html>
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="authors" content="scorchinRebar, chińczyk, majomajo112">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-    <script type="module" src="supabase.js"></script>
-    <link rel="stylesheet" href="style.css">
-    <title>Talonowo</title>
+  <meta charset="utf-8">
+  <title>Auth z Firestore example</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:20px}
+    input{display:block;margin:8px 0;padding:8px;width:300px}
+    button{padding:8px 12px;margin-right:8px}
+    #content{display:none}
+    .error{color:#b00}
+    .info{margin-top:10px}
+  </style>
 </head>
 <body>
-    <div id="page">
-        
-        <div id="headerAndNav">
-            <header id="header">
-                <img src="img/header.png" alt="header Talonowo">
-            </header>
 
-            <div id="navGroup">
-                <div onclick="openSite(this)" class="nav" id="nav1"><h3>ZASADY</h3>             <h3>(*IKONKA*)</h3></div>
-                <div onclick="openSite(this)" class="nav" id="nav2"><h3>work in progress</h3>   <h3>(*IKONKA*)</h3></div>
-                <div onclick="openSite(this)" class="nav" id="nav3"><h3>KALKULATOR</h3>         <h3>(*IKONKA*)</h3></div>
-                <div onclick="openSite(this)" class="nav" id="nav4"><h3>work in progress</h3>   <h3>(*IKONKA*)</h3></div>
-                <div onclick="openSite(this)" class="nav" id="nav5"><h3>AUTORZY</h3>            <h3>(*IKONKA*)</h3></div>
-            </div>
-        </div>
+<h2>auth example</h2>
 
-        <div id="mainContent">
-            zawartość strony bang
-            <br><br>
-            <h1><em>KOLORY PODGLĄDOWE GŁÓWNEGO TECHNIKA majomajo112 - NIE ODZWIERCIEDLAJĄ FINAŁOWEGO WYGLĄDU</em></h1> <br><br>
-            <form id="signup-form">
-                <input type="email" id="email" placeholder="Email" required />
-                <input type="password" id="password" placeholder="Password" required />
-            <button type="submit">Sign Up</button>
-            </form> <br><br>
-            <form id="login-form">
-                <input type="email" id="login-email" placeholder="Email" required />
-                <input type="password" id="login-password" placeholder="Password" required />
-            <button type="submit">Log In</button>
-            </form> <br><br>
+<div id="unauth">
+  <input id="email" placeholder="email">
+  <input id="password" type="password" placeholder="hasło">
+  <input id="nick" placeholder="nick przy rejestracji">
+  <button id="btnReg">rejestruj</button>
+  <button id="btnLog">loguj</button>
+  <div id="msg" class="error"></div>
+</div>
 
-            <p id="role-status">Checking role...</p>
-            
+<div id="content">
+  <div>zalogowany jako <span id="showNick"></span> status <span id="showStatus"></span></div>
+  <div class="info">
+    <button id="btnLogout">wyloguj</button>
+    <button id="btnRefresh">odśwież profil</button>
+  </div>
+  <div id="adminPanel" style="margin-top:20px;display:none">
+    <h4>panel admina</h4>
+    <div>tu możesz robić co chcesz</div>
+  </div>
+</div>
 
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"
+  import {
+    getAuth,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut,
+    onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"
+  import {
+    getFirestore,
+    doc,
+    setDoc,
+    getDoc,
+    updateDoc
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"
 
-            <br><br>
-            <button onclick="window.location.href = 'https://www.tiktok.com/@silacytatu?lang=pl-PL'" id="bartoszyce">beng</button>
-        </div>
+  // wklej tu swoje dane z firebase config
+  const firebaseConfig = {
+    apiKey: "TWOJE_API_KEY",
+    authDomain: "TWOJE_AUTH_DOMAIN",
+    projectId: "TWOJE_PROJECT_ID",
+    storageBucket: "TWOJE_STORAGE_BUCKET",
+    messagingSenderId: "TWOJE_MSG_ID",
+    appId: "TWOJE_APP_ID"
+  }
 
-    </div>
+  const app = initializeApp(firebaseConfig)
+  const auth = getAuth(app)
+  const db = getFirestore(app)
 
-    <script>
-    function openSite(nav) {
-        console.log("bang " + nav.id);
+  const emailEl = document.getElementById("email")
+  const passEl = document.getElementById("password")
+  const nickEl = document.getElementById("nick")
+  const msgEl = document.getElementById("msg")
+  const unauthEl = document.getElementById("unauth")
+  const contentEl = document.getElementById("content")
+  const showNick = document.getElementById("showNick")
+  const showStatus = document.getElementById("showStatus")
+  const adminPanel = document.getElementById("adminPanel")
+
+  document.getElementById("btnReg").addEventListener("click", async () => {
+    msgEl.textContent = ""
+    const mail = emailEl.value.trim()
+    const pass = passEl.value
+    const nick = nickEl.value.trim() || "no-nick"
+    if(!mail || !pass){
+      msgEl.textContent = "wypełnij mail i hasło"
+      return
     }
-    </script>
+    try{
+      const cred = await createUserWithEmailAndPassword(auth, mail, pass)
+      const uid = cred.user.uid
+
+      await setDoc(doc(db, "users", uid), {
+        email: mail,
+        nick: nick,
+        status: "pending", 
+        blocked: false,
+        createdAt: Date.now()
+      })
+      msgEl.textContent = "zarejestrowano. sprawdź logowanie"
+      passEl.value = ""
+    }catch(e){
+      console.error(e)
+      msgEl.textContent = e.message || "błąd rejestracji"
+    }
+  })
+
+  document.getElementById("btnLog").addEventListener("click", async () => {
+    msgEl.textContent = ""
+    const mail = emailEl.value.trim()
+    const pass = passEl.value
+    if(!mail || !pass){
+      msgEl.textContent = "wypełnij mail i hasło"
+      return
+    }
+    try{
+      const cred = await signInWithEmailAndPassword(auth, mail, pass)
+
+    }catch(e){
+      console.error(e)
+      msgEl.textContent = "złe dane albo problem z auth"
+    }
+  })
+
+  document.getElementById("btnLogout").addEventListener("click", async () => {
+    await signOut(auth)
+  })
+
+  document.getElementById("btnRefresh").addEventListener("click", async () => {
+    if(auth.currentUser) await handlePostLogin(auth.currentUser)
+  })
+
+  onAuthStateChanged(auth, async user => {
+    msgEl.textContent = ""
+    if(user){
+      await handlePostLogin(user)
+    } else {
+      contentEl.style.display = "none"
+      unauthEl.style.display = "block"
+    }
+  })
+
+  async function handlePostLogin(user){
+    // pobierz dokument profilu
+    try{
+      const ref = doc(db, "users", user.uid)
+      const snap = await getDoc(ref)
+      if(!snap.exists()){
+
+        await setDoc(ref, {
+          email: user.email || "",
+          nick: user.displayName || "no-nick",
+          status: "pending",
+          blocked: false,
+          createdAt: Date.now()
+        })
+
+        const ns = await getDoc(ref)
+        showProfile(ns.data(), user)
+        return
+      }
+      const data = snap.data()
+      if(data.blocked){
+
+        await signOut(auth)
+        msgEl.textContent = "konto zablokowane"
+        return
+      }
+      showProfile(data, user)
+    }catch(e){
+      console.error(e)
+      msgEl.textContent = "błąd pobierania profilu"
+      await signOut(auth)
+    }
+  }
+
+  function showProfile(data, user){
+    unauthEl.style.display = "none"
+    contentEl.style.display = "block"
+    showNick.textContent = data.nick || user.email
+    showStatus.textContent = data.status || "pending"
+    // pokaż panel admina jeśli status admin
+    if(data.status === "admin"){
+      adminPanel.style.display = "block"
+    } else {
+      adminPanel.style.display = "none"
+    }
+  }
+
+
+  window.setBlocked = async (uid, val) => {
+    await updateDoc(doc(db, "users", uid), { blocked: !!val })
+  }
+  window.setStatus = async (uid, status) => {
+    await updateDoc(doc(db, "users", uid), { status: status })
+  }
+
+</script>
 </body>
 </html>
-
